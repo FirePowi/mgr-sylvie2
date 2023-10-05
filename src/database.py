@@ -1,14 +1,19 @@
 #!/usr/bin/python3
-
 """
-Developper of the former "PraxisBot" used as based for this bot
-Copyright (C) 2018 MonaIzquierda (mona.izquierda@gmail.com)
+Main file of Manager Sylvie 2.0, a discord all-in-one bot.
 
-Developper of "YetAnotherFork" and "Manager Sylvie 2.0"
-Copyright (C) 2022-2023 Powi (powi@powi.fr)
+Manager Sylvie 2.0 is a rework of YetAnotherFork 
+YetAnotherFork is a fork of PraxisBot,
+PraxisBot was developped by MonaIzquierda.
+Manager Sylvie 2.0 is a bot developped by Powi,
+Manager Sylvie 2.0 is intended to be an all-in-one bot for Discord.
+
+Developper of the former "Sylvie" used as based for this bot
+Copyright (C) 2018 MonaIzquierda (mona.izquierda@gmail.com).
+Developper of "YetAnotherFork" and "Manager Sylvie 2.0" (this bot)
+Copyright (C) 2022-2023 Powi (powi@powi.fr).
 
 This file is part of Manager Sylvie 2.0.
-Manager Sylvie 2.0 is a rework of YetAnotherFork which is a fork of PraxisBot
 
 Manager Sylvie 2.0 is free software: you can redistribute it and/or  modify
 it under the terms of the GNU Affero General Public License, version 3,
@@ -22,10 +27,13 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with Manager Sylvie 2.0.  If not, see <http://www.gnu.org/licenses/>.
 """
+
+# standard library
+import os
+
+# third-party library
 import mysql.connector as sql
 from mysql.connector import errorcode
-import os
-import utils
 import sqlite3
 
 MYSQL = 0
@@ -35,19 +43,35 @@ SQLITE3 = 1
 #   Database   #
 ################
 
+# TODO: Add a way to use the database without the bot, for example in a web interface.
 
 class Database():
+    """Database class, used to interact with the database."""
 
     def databasetable(self, name): return self.databaseprefix + name
 
     def execute_and_commit(self, request):
+        """Execute a request and commit it to the database.
+
+        Args:
+            request (str): The request to execute (SQL).
+        """
         self.databasecursor.execute(request)
         self.databasecon.commit()
 
     def execute(self, request):
+        """Execute a request to the database."""
         return self.databasecursor.execute(request)
 
     def __init__(self, dev_mode):
+        """Initialize the database.
+        
+        Initialize the database, and create the guild tables if they don't exist.
+        Set to sqlite3 if in development mode, else runs mysql.
+        
+        Args:
+            dev_mode (bool): If the bot is in development mode or not.
+        """
 
         self.databaseprefix = "ms2_"
 

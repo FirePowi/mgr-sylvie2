@@ -28,24 +28,33 @@ You should have received a copy of the GNU Affero General Public License
 along with Manager Sylvie 2.0.  If not, see <http://www.gnu.org/licenses/>.
 """
 
+# Standard library imports
+import datetime
+import json
+import re
 import sys
 import traceback
-import datetime
-import re
-import json
+import logging
 
+# Third party imports
 import discord
 from discord import app_commands
 
-import utils
-
+# Local application imports
 from database import Database
+import utils
 from plugins.core import CorePlugin
 
 ###########
 ##  Bot  ##
 ###########
-
+# TODO: Create en table for each guild, and store the data in it:
+#       - On guild join, create the table
+#       - On guild leave, delete the table
+#       - On guild update, update the table
+#       - On bot update, update the table
+#       - On bot join, update the table
+#       - On bot leave, update the table
 
 class Sylvie(discord.Client):
     """
@@ -67,6 +76,11 @@ class Sylvie(discord.Client):
         self.banned_members = {}
         self.shell = utils.Shell(self, self.database, self.tree)
 
+    def setup_logger(self, logger):
+        """Set up the logger."""
+        self.logger = logger
+        self.shell.setup_logger(logger)
+
     async def setup_hook(self):
         """Set up the bot."""
         dev_guild = discord.Object(1051692008307183656)
@@ -79,7 +93,7 @@ class Sylvie(discord.Client):
 
     async def on_ready(self):
         """Triggered when the bot is ready to use."""
-        print(f'Bot logged on as {self.user}')
+        self.logger.info(f'Bot logged on as {self.user}')
 
         self.owner = self.application.owner
         self.load_plugins()
@@ -99,6 +113,7 @@ class Sylvie(discord.Client):
                     print(traceback.format_exc())
                 else:
                     print(traceback.format_exc())
+
 
     async def on_raw_reaction_add(self, payload: discord.RawReactionActionEvent):
         """
@@ -121,7 +136,7 @@ class Sylvie(discord.Client):
                 added = None
             await self.on_reaction_event(message, emoji, member, added)
         except AttributeError as output:
-            print(f'Error on_raw_reaction_add: {output}')
+            self.logger.error(f'Error on_raw_reaction_add: {output}')
 
     async def on_reaction_event(self,
                                 message: discord.Message,
@@ -152,9 +167,10 @@ class Sylvie(discord.Client):
             try:
                 await plugin.on_reaction(scope, message, emoji, member, added)
             except discord.DiscordException:
-                print(traceback.format_exc())
+                self.logger.error(traceback.format_exc())
             else:
-                print(traceback.format_exc())
+                self.logger.error(traceback.format_exc())
+
 
     async def on_message(self, message: discord.Message):
         """
@@ -201,6 +217,7 @@ class Sylvie(discord.Client):
             else:
                 print(traceback.format_exc())
 
+
     async def on_member_join(self, member):
         """Triggered when a member joins the guild.
 
@@ -218,9 +235,9 @@ class Sylvie(discord.Client):
                 await plugin.on_member_join(scope)
 
         except discord.DiscordException:
-            print(traceback.format_exc())
+            self.logger.error(traceback.format_exc())
         else:
-            print(traceback.format_exc())
+            self.logger.error(traceback.format_exc())
 
     async def on_raw_member_remove(self, payload):
         """Triggered when a member leaves the guild.
@@ -258,9 +275,9 @@ class Sylvie(discord.Client):
                     await plugin.on_kick(scope)
 
         except discord.DiscordException:
-            print(traceback.format_exc())
+            self.logger.error(traceback.format_exc())
         else:
-            print(traceback.format_exc())
+            self.logger.error(traceback.format_exc())
 
     async def on_member_ban(self, guild: discord.Guild, member: discord.Member):
         """
@@ -308,9 +325,9 @@ class Sylvie(discord.Client):
                 await plugin.on_ban(scope)
 
         except discord.DiscordException:
-            print(traceback.format_exc())
+            self.logger.error(traceback.format_exc())
         else:
-            print(traceback.format_exc())
+            self.logger.error(traceback.format_exc())
 
     async def on_member_unban(self, guild, user):
         """
@@ -331,9 +348,9 @@ class Sylvie(discord.Client):
                 await plugin.on_unban(scope)
 
         except discord.DiscordException:
-            print(traceback.format_exc())
+            self.logger.error(traceback.format_exc())
         else:
-            print(traceback.format_exc())
+            self.logger.error(traceback.format_exc())
 
 
 #############
@@ -342,19 +359,60 @@ class Sylvie(discord.Client):
 
 def main():
     """Start the bot."""
-    with open('config.json', 'r', encoding="UTF-8") as f:
-        config = json.load(f)
+    try:
+        with open('config.json', 'r', encoding="UTF-8") as f:
+            config = json.load(f)
+    except FileNotFoundError:
+        with open('config.json', 'w', encoding="UTF-8") as f:
+            json.dump({"token": "", "dev_mode": False}, f)
+        print("Please edit config.json to add a bot token.")
+        sys.exit(0)
     token = config['token']
     dev_mode = config['dev_mode']
+    
+    # Set up logging
+    logger = logging.getLogger('discord')
+    logger.setLevel(logging.DEBUG)
+    logging.getLogger('discord.http').setLevel(logging.INFO)
+
+    log_handler = logging.handlers.RotatingFileHandler(
+        filename='discord.log',
+        encoding='utf-8',
+        maxBytes=1 * 1024 * 1024,  # 1 MiB
+        backupCount=3,  # Rotate through 3 files
+    )
+    err_handler = logging.handlers.RotatingFileHandler(
+        filename='discord.err',
+        encoding='utf-8',
+        maxBytes=1 * 1024 * 1024,  # 1 MiB
+        backupCount=3,  # Rotate through 3 files
+    )
+    dt_fmt = '%Y-%m-%d %H:%M:%S' # Format for datetime: YYYY-MM-DD HH:MM:SS
+
+    # Format for logging: [datetime] [loglevel] loggername: message
+    # Style is set to '{' to avoid conflicts with f-strings
+    formatter = logging.Formatter('[{asctime}] [{levelname:<8}] {name}: {message}', dt_fmt, style='{')
+    log_handler.setFormatter(formatter)
+    err_handler.setFormatter(formatter)
+
+    err_handler.setLevel(logging.WARNING)
+
+    logger.addHandler(log_handler, err_handler)
 
     try:
         bot = Sylvie(dev_mode)
+        bot.setup_logger(logger)
         bot.run(token)
     except KeyboardInterrupt:
         bot.loop.run_until_complete(bot.logout())
         bot.loop.close()
-        print("Bot closed.")
+        logger.info("Bot closed.")
         sys.exit(0)
+    except Exception as e:
+        bot.loop.run_until_complete(bot.logout())
+        bot.loop.close()
+        logger.exception("Unhandled exception occured in main().")
+        sys.exit(1)
 
 
 if __name__ == '__main__':

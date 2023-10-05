@@ -1,0 +1,6 @@
+{
+    "files.exclude": {
+        "*/*tmp*": true
+    },
+    "python.languageServer": "Pylance",
+}

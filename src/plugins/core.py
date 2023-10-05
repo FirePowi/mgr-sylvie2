@@ -21,25 +21,21 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with Manager Sylvie 2.0.  If not, see <http://www.gnu.org/licenses/>.
 """
-import re
+# standard library
 from typing import Optional, Union
-import copy
-import inspect
-import datetime
-import shlex
+
+# Thrid party modules
 import discord
-from discord import app_commands
-
-from src import homeparse as argparse
-# import discord_parse as argparse
-from pytz import timezone
+import discord.app_commands as app_commands
 from dateutil.relativedelta import relativedelta
-from src import utils
-from io import StringIO
-import asyncio
+from pytz import timezone
+
+# Local modules
+import src.discord_parse as argparse
+from src.utils import Plugin, command, slash_command
 
 
-class CorePlugin(utils.Plugin):
+class CorePlugin(Plugin):
     """
     Core Commands
     """
@@ -56,13 +52,16 @@ class CorePlugin(utils.Plugin):
         super().__init__(shell)
         self.add_command("say", self.execute_say)
 
-    @command(name='say')
-    # @app_commands.describe()
+    @app_commands.command(
+        name="say",
+        description="A command allowing you to send a message")
     async def slash_say(self,
                         interaction: discord.Interaction,
                         message: str,
-                        recipient: Optional[Union[discord.abc.GuildChannel, discord.User]],
-                        reactions: Optional[list[Union[discord.Emoji, discord.PartialEmoji, str]]],
+                        recipient: Optional[Union[discord.abc.GuildChannel,
+                                                  discord.User]],
+                        reactions: Optional[list[Union[discord.Emoji,
+                                                       discord.PartialEmoji]]],
                         title: Optional[str],
                         description: Optional[str],
                         footer: Optional[str],
@@ -71,118 +70,58 @@ class CorePlugin(utils.Plugin):
                         author: Optional[str],
                         authorimage: Optional[str],
                         authorurl: Optional[str],
-                        fields: Optional[list[str]]
-                        ):
-        """"""
-        "A command allowing you to send a message"
+                        fields: Optional[list[str]]):
+        """
+        A command allowing you to send a message.
+
+        Args:
+            interaction: The interaction.
+            message: The message to send.
+            recipient: The recipient of the message.
+            reactions: The reactions to add to the message.
+            title: The title of the embed.
+            description: The description of the embed.
+            footer: The footer of the embed.
+            footerimager: The footer image of the embed.
+            thumbnail: The thumbnail of the embed.
+        """
+        if not message:
+            interaction.response.send_message(
+                "You must specify a message",
+                ephemeral=True)
+            return
+
+        # Where to send the message
         if not recipient:
-            pass
+            recipient = interaction.channel or interaction.user
+        if isinstance(recipient, discord.User):
+            if recipient.dm_channel is None:
+                await recipient.create_dm()
+            recipient = recipient.dm_channel
+        if not isinstance(recipient, discord.abc.Messageable):
+            recipient = interaction.channel or interaction.user.dm_channel
+        if not recipient:
+            interaction.response.send_message(
+                "Could not find a channel to send the message to",
+                ephemeral=True)
+            return
 
-    def generate_say_arguments(subcommand=None):
-        common_args = {
-            'recipient':
-            {
-                'name': 'recipient', 'aliases': ['c', 'channel', 'r'],
-                'description': 'Recipient of the message (can be a channel or a member).',
-                'type': Union[discord.abc.GuildChannel, discord.User], 'optional': True
-            },
-            'reactions':
-            {
-                'name': 'reactions', 'aliases': None,
-                'description': 'Reactions to add to the message after sending it.',
-                'type': Optional[list[Union[discord.Emoji, discord.PartialEmoji, str]]]
-            }
-        }
-        if not subcommand:
-            subcommand_args = {
-                'message':
-                {
-                    'name': 'message',
-                    'aliases': None,
-                    'description': 'Message to be sent.',
-                    'type': str
-                }
+        # Check permissions
+        if not isinstance(recipient, discord.User):
+            if not can_they_see:
+                interaction.response.send_message(
+                    "You do not have permission to send messages in this channel",
+                    ephemeral=True)
+                return
 
-            }
-        if subcommand == 'embed':
-            subcommand_args = {
-                'title':
-                {
-                    'name': 'title',
-                    'aliases': None,
-                    'description': 'Title of the Embed',
-                    'type': str
-                },
-                'description':
-                {
-                    'name': 'description',
-                    'aliases': None,
-                    'description': 'Description of the Embed',
-                    'type': str
-                },
-                'footer':
-                {
-                    'name': 'footer',
-                    'aliases': None,
-                    'description': 'Footer of the Embed',
-                    'type': str
-                },
-                'footerimage':
-                {
-                    'name': 'footerimage',
-                    'aliases': ['fi'],
-                    'description': 'Footer image of the Embed',
-                    'type': Optional[str]
-                },
-                'image':
-                {
-                    'name': 'image',
-                    'aliases': ['i'],
-                    'description': 'Image of the Embed',
-                    'type': Optional[str]
-                },
-                'thumbnail':
-                {
-                    'name': 'thumbnail',
-                    'aliases': ['m'],
-                    'description': 'Thumbnail of the Embed',
-                    'type': Optional[str]
-                },
-                'author':
-                {
-                    'name': 'author',
-                    'aliases': None,
-                    'description': 'Author of the Embed',
-                    'type': Optional[str]
-                },
-                'authorimage':
-                {
-                    'name': 'authorimage',
-                    'aliases': None,
-                    'description': 'Author image of the Embed',
-                    'type': Optional[str]
-                },
-                'authorurl':
-                {
-                    'name': 'authorurl',
-                    'aliases': None,
-                    'description': 'Author URL of the Embed',
-                    'type': Optional[str]
-                },
-                'fields':
-                {
-                    'name': 'fields',
-                    'aliases': None,
-                    'description': 'List of key/value',
-                    'type': Optional[list[str]]
-                }
-
-            }
-
-        return common_args
-
-    @utils.command(description="A command allowing you to send a message")
-    async def execute_say(self, scope, command, options, lines, description=None):
+    @command(description="A command allowing you to send a message")
+    async def execute_say(
+        self,
+        scope,
+        command,
+        options,
+        lines,
+        description=None):
         """Execute the 'say' command within a Discord context.
 
         Args:
@@ -217,13 +156,17 @@ class CorePlugin(utils.Plugin):
         embed_subparser = parser.add_subparsers(
             required=False,
             title='Embed',
-            description='Subcommand to send an Embed message instead of a regular message',
+            description='Subcommand to send an Embed message',
             dest='subparser')
         # Create a subparser for embed arguments
         embed_parser = embed_subparser.add_parser(
-            'embed', help='embed subcommand', parents=[common])
+            '--embed',
+            help='embed subcommand',
+            parents=[common])
         # Create embed arguments
-        embed_parser.add_argument('title', help='Embed title')
+        embed_parser.add_argument(
+            'title',
+            help='Embed title')
         embed_parser.add_argument(
             'description',
             nargs='?',
@@ -247,17 +190,25 @@ class CorePlugin(utils.Plugin):
 
         if args.recipient:
             # recipient = scope.shell.find_channel(scope.format_text(args.channel).strip(), scope.guild)
-            recipient = scope.shell.find_anything(scope.guild, 'channels', joker=scope.format_text(args.recipient)) or \
-                scope.shell.find_anything(
+            recipient = scope.shell.find_anything(
                 scope.guild,
-                'members',
-                joker=scope.format_text(
-                    args.recipient))
+                'channels',
+                joker=scope.format_text(args.recipient)
+                )
+            if not recipient:
+                recipient = scope.shell.find_anything(
+                    scope.guild,
+                    'members',
+                    joker=scope.format_text(args.recipient)
+                    )
         else:
             recipient = scope.channel
 
         if not recipient:
-            await scope.shell.print(scope, f"Unknown channel or member `{args.recipient}`", 'error')
+            await scope.shell.print(
+                scope, 
+                f"Unknown channel or member `{args.recipient}`",
+                'error')
             return
 
         if scope.permission < utils.UserPermission.Script and (isinstance(
@@ -289,8 +240,17 @@ class CorePlugin(utils.Plugin):
             formated_text += sftxt(message)
 
         embed = None
-        if any([args.title, args.description, args.footer, args.footerimage, args.image,
-               args.thumbnail, args.author, args.authorimage, args.authorurl, args.fields]):
+        if any([
+                args.title,
+                args.description,
+                args.footer,
+                args.footerimage,
+                args.image,
+                args.thumbnail,
+                args.author,
+                args.authorimage,
+                args.authorurl,
+                args.fields]):
             embed = discord.Embed()
             embed.type = 'rich'
 
@@ -300,29 +260,37 @@ class CorePlugin(utils.Plugin):
             embed.set_thumbnail(url=sftxt(args.thumbnail)
                                 ) if args.thumbnail else None
 
-            footer_params = {'text': sftxt(args.footer) if args.footer else None,
-                             'icon_url': sftxt(args.footerimage) if args.footerimage else None}
-            if any([footer_params.get('text'), footer_params.get('icon_url')]):
+            # Set the footer if applicable
+            footer_params = {}
+            if args.footer:
+                footer_params['text'] = sftxt(args.footer)
+            if args.footerimage:
+                footer_params['icon_url'] = sftxt(args.footerimage)
+            # If any of the footer params are set, set the footer
+            if footer_params:
                 embed.set_footer(**footer_params)
 
-            author_params = {'name': sftxt(args.author) if args.author else None,
-                             'icon_url': sftxt(args.authorimage) if args.authorimage else None,
-                             'url': sftxt(args.authorurl) if args.authorurl else None}
-            if any([author_params.get('name'), author_params.get(
-                    'icon_url'), author_params.get('url')]):
+            # Set the author if applicable
+            author_params = {}
+            if args.author:
+                author_params['name'] = sftxt(args.author)
+            if args.authorimage:
+                author_params['icon_url'] = sftxt(args.authorimage)
+            if args.authorurl:
+                author_params['url'] = sftxt(args.authorurl)
+            # If any of the author params are set, set the author
+            if author_params:
                 embed.set_author(**author_params)
 
-            if args.fields:
-                field_key = None
-                for field in args.fields:
-                    if not field_key:
-                        field_key = field
-                    else:
-                        embed.add_field(
-                            name=sftxt(field_key), value=sftxt(field))
+            # Set the fields if applicable
+            for field in args.fields:
+                field_key, field_value = field.split('=')
+                embed.add_field(
+                    name=sftxt(field_key),
+                    value=sftxt(field_value)
+                    )
 
         if embed or len(formated_text.strip()) > 0:
             msg = await subscope.channel.send(formated_text, embed=embed)
-            if args.reactions:
-                for emoji in args.reactions:
-                    await msg.add_reaction(emoji)
+            for emoji in args.reactions:
+                await msg.add_reaction(emoji)
