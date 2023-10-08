@@ -1,5 +1,6 @@
 # Author: Steven J. Bethard <steven.bethard@gmail.com>.
-# New maintainer as of 29 August 2019:  Raymond Hettinger <raymond.hettinger@gmail.com>
+# New maintainer as of 29 August 2019:
+# Raymond Hettinger <raymond.hettinger@gmail.com>
 
 """Command-line parsing library
 
@@ -83,7 +84,6 @@ __all__ = [
     'SUPPRESS',
     'ZERO_OR_MORE',
 ]
-
 
 import os as _os
 import re as _re
@@ -351,7 +351,7 @@ class HelpFormatter():
         if text is not SUPPRESS and text is not None:
             self._add_item(self._format_text, [text])
 
-    def add_usage(self, usage, actions, groups, prefix=None):
+    def add_usage(self, usage, actions, groups, prefix=None): 
         """
         Add usage information to the help text.
 
@@ -457,7 +457,8 @@ class HelpFormatter():
 
         # if usage is specified, use that
         if usage is not None:
-            usage = usage % dict(command=self._command)
+            # usage = usage % dict(command=self._command)
+            usage = usage.format(command=self._command)
 
         # if no optionals or positionals are available, usage is just command
         elif usage is None and not actions:
@@ -1305,7 +1306,7 @@ class _VersionAction(Action):
                  version=None,
                  dest=SUPPRESS,
                  default=SUPPRESS,
-                 help="show commandram's version number and exit"):
+                 help="show command's version number and exit"):
         super(_VersionAction, self).__init__(
             option_strings=option_strings,
             dest=dest,
@@ -1894,7 +1895,7 @@ class ArgumentParser(_AttributeHolder, _ActionsContainer):
     """Object for parsing command line strings into Python objects.
 
     Keyword Arguments:
-        - command -- The name of the commandram (default:
+        - command -- The name of the command (default:
             ``os.path.basename(sys.argv[0])``)
         - usage -- A usage message (default: auto-generated from arguments)
         - description -- A description of what the commandram does
@@ -1902,7 +1903,7 @@ class ArgumentParser(_AttributeHolder, _ActionsContainer):
         - parents -- Parsers whose arguments should be copied into this one
         - formatter_class -- HelpFormatter class for printing help messages
         - prefix_chars -- Characters that prefix optional arguments
-        - fromfile_prefix_chars -- Characters that prefix files containing
+        - DELETE_ME_IM_FILE_RELATED -- Characters that prefix files containing
             additional arguments
         - argument_default -- The default value for all arguments
         - conflict_handler -- String indicating how to handle conflicts
@@ -1920,12 +1921,38 @@ class ArgumentParser(_AttributeHolder, _ActionsContainer):
                  parents=[],
                  formatter_class=HelpFormatter,
                  prefix_chars='-',
-                 fromfile_prefix_chars=None,
                  argument_default=None,
                  conflict_handler='error',
                  add_help=True,
                  allow_abbrev=True,
                  exit_on_error=True):
+        """
+        Instantiate a command parser.
+
+        By default, the parser has no description and contains no arguments.
+
+        Args:
+            command (str): The name of the command (default: command)
+            usage (str): A usage message (default: None)
+            description (str): A description of what the command does
+                (default: None)
+            epilog (str): Text following the argument descriptions
+                (default:None)
+            parents (list): Parsers whose arguments should be copied into this
+            formatter_class (class): HelpFormatter class for printing help
+                (default: HelpFormatter)
+            prefix_chars (str): Characters that prefix optional arguments
+                (default: '-')
+            argument_default (str): The default value for all arguments
+                (default: None)
+            conflict_handler (str): String indicating how to handle conflicts
+                (default: 'error')
+            add_help (bool): Add a -h/-help option (default: True)
+            allow_abbrev (bool): Allow long options to be abbreviated
+                unambiguously (default: True)
+            exit_on_error (bool): Determines whether or not ArgumentParser
+                exits with error info when an error occurs (default: True)
+        """
 
         superinit = super(ArgumentParser, self).__init__
         superinit(description=description,
@@ -1935,13 +1962,13 @@ class ArgumentParser(_AttributeHolder, _ActionsContainer):
 
         # default setting for command
         if command is None:
-            command = _os.path.basename(_sys.argv[0])
+            command = "command"
 
         self.command = command
         self.usage = usage
         self.epilog = epilog
         self.formatter_class = formatter_class
-        self.fromfile_prefix_chars = fromfile_prefix_chars
+        self.DELETE_ME_IM_FILE_RELATED = DELETE_ME_IM_FILE_RELATED
         self.add_help = add_help
         self.allow_abbrev = allow_abbrev
         self.exit_on_error = exit_on_error
@@ -1951,19 +1978,20 @@ class ArgumentParser(_AttributeHolder, _ActionsContainer):
         self._optionals = add_group(_('options'))
         self._subparsers = None
 
-        # register types
         def identity(string):
-            return string
+            return string  # default identity function
         self.register('type', None, identity)
 
         # add help argument if necessary
         # (using explicit default to override global argument_default)
         default_prefix = '-' if '-' in prefix_chars else prefix_chars[0]
+
+        # add help argument if necessary
         if self.add_help:
             self.add_argument(
                 default_prefix+'h', default_prefix*2+'help',
                 action='help', default=SUPPRESS,
-                help=_('show this help message and exit'))
+                help=_('Show this help message and exit.'))
 
         # add parent arguments and defaults
         for parent in parents:
@@ -2090,7 +2118,7 @@ class ArgumentParser(_AttributeHolder, _ActionsContainer):
 
     def _parse_known_args(self, arg_strings, namespace):
         # replace arg strings that are file references
-        if self.fromfile_prefix_chars is not None:
+        if self.DELETE_ME_IM_FILE_RELATED is not None:
             arg_strings = self._read_args_from_files(arg_strings)
 
         # map all mutually exclusive arguments to the other arguments
@@ -2344,7 +2372,7 @@ class ArgumentParser(_AttributeHolder, _ActionsContainer):
         for arg_string in arg_strings:
 
             # for regular arguments, just add them back into the list
-            if not arg_string or arg_string[0] not in self.fromfile_prefix_chars:
+            if not arg_string or arg_string[0] not in self.DELETE_ME_IM_FILE_RELATED:
                 new_arg_strings.append(arg_string)
 
             # replace arguments referencing files with the file content

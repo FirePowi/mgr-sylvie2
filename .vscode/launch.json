@@ -1,10 +1,14 @@
 {
-    "configurations": [{
-        "name": "Python: Current File",
-        "type": "python",
-        "request": "launch",
-        "program": "src/main.py",
-        "console": "integratedTerminal",
-        "justMyCode": true,
-    }]
+    "configurations": [
+
+        {
+            "name": "Python: Current File",
+            "type": "python",
+            "request": "launch",
+            "program": "src/main.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "cwd": "${workspaceFolder}/src"
+        },
+    ]
 }
