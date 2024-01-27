@@ -44,7 +44,10 @@ import discord
 import discord.interactions
 
 # Local imports
-import argparse
+import discord_parse as dparse
+
+UsageError = dparse.UsageError
+ArgumentError = dparse.ArgumentError
 
 ###########
 # Enums   #
@@ -131,7 +134,7 @@ class RegexError(Error):
 ################
 
 
-def command(description=None):
+def add_command(description=None):
     """
     Store command in the tree.
 
@@ -641,6 +644,7 @@ class ExecutionScope:
 #  Shell  #
 ###########
 
+
 class Shell:
     """A shell for the bot that provides various utility functions.
 
@@ -748,7 +752,8 @@ class Shell:
             host_resources = locations.get(host_type)
 
             if search_item not in host_resources:
-                # Should never happen, error in the code! Check the traceback to see where find_anything has been called.
+                # Should never happen, error in the code!
+                # Check the traceback to see where find_anything has been called.
                 raise ErrorInCode(f"Type {search_item} can not be found in {host_type}")
 
             source = getattr(host, search_item)
@@ -756,10 +761,10 @@ class Shell:
             # returns the value of the named attribute of an object.
             # Here, it returns the value of the attribute
             # "search_item" of the object "host"
-            #Example: getattr(Discord.Guild, 'members')
-            # returns the list of members of the guild.
-            #Example: getattr(Discord.Guild, 'me')
-            # returns the bot's member object in the guild.
+            # Example: getattr(Discord.Guild, 'members')
+            #  returns the list of members of the guild.
+            # Example: getattr(Discord.Guild, 'me')
+            #  returns the bot's member object in the guild.
 
             if not isinstance(source, collections.abc.Iterable):
                 return source
@@ -773,8 +778,8 @@ class Shell:
                             return item
             return None
 
-        except IndexError:
-            self.print()
+        except IndexError as error:
+            self.print(scope, error, 'error')
 
     def is_plugin_loaded(self, plugin):
         """Checks if a plugin is already loaded.
@@ -853,8 +858,8 @@ class Shell:
             if not possibility:
                 continue
             if not possibility.permissions_for(guild.me).send_messages:
-                #check if the bot can send messages in the channel
-                #if not, we keep track of the missing permissions
+                # check if the bot can send messages in the channel
+                # if not, we keep track of the missing permissions
                 if missing_write_permissions is []:
                     missing_write_permissions = possibility
                 continue
@@ -867,7 +872,11 @@ class Shell:
             raise Error("No channel found (what?).")
         if missing_write_permissions is not None:
             scope = self.create_scope(guild, [''])
-            self.print(scope, f"{guild.me.mention} does **not** have permission to send messages in {missing_write_permissions[0].mention}.", 'fatal')
+            me = guild.me.mention
+            channel = missing_write_permissions[0].mention
+            self.print(scope,
+                       f"{me} does **not** have permission to send messages in {channel}.",
+                       'fatal')
 
         return default_channel
 
@@ -989,7 +998,7 @@ class Shell:
             except RegexError as error:
                 await self.print(scope, f"`{error.regex}` is not a valid regex", 'error')
                 break
-            except Exception as e:
+            except Exception as error:
                 await self.print(scope, f"**Manager Sylvie Unexpected Error**\n\n```traceback\n{traceback.format_exc()}```", 'fatal')
                 break
         else:
@@ -1105,10 +1114,10 @@ class Plugin:
         try:
             args = parser.parse_args(shlex.split(options)) if options else None
             return args
-        except ParserExit as error:
+        except UsageError as error:
             message = getattr(error, 'text', str(error))
             await self.shell.print(scope, message, 'usage')
-        except ParserError as error:
+        except ParserExit as error:
             message = getattr(error, 'text', str(error))
             if message.find(f"{parser.prog}: error: ") >= 0:
                 parts = message.split(f"{parser.prog}: error: ")

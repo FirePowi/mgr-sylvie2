@@ -2,7 +2,7 @@
 """
 Main file of Manager Sylvie 2.0, a discord all-in-one bot.
 
-Manager Sylvie 2.0 is a rework of YetAnotherFork 
+Manager Sylvie 2.0 is a rework of YetAnotherFork
 YetAnotherFork is a fork of PraxisBot,
 PraxisBot was developped by MonaIzquierda.
 Manager Sylvie 2.0 is a bot developped by Powi,
@@ -56,6 +56,7 @@ from plugins.core import CorePlugin
 #       - On bot join, update the table
 #       - On bot leave, update the table
 
+
 class Sylvie(discord.Client):
     """
     Manager Sylvie 2.0's main class.
@@ -103,7 +104,7 @@ class Sylvie(discord.Client):
             scope = self.shell.create_scope(guild, [""])
             scope.channel = self.shell.get_default_channel(guild)
             scope.user = guild.me
-            scope.permission = utils.UserPermission.Script
+            scope.permission = utils.UserPermission.SCRIPT
 
             for plugin in self.shell.plugins:
                 self.banned_members = {}
@@ -113,7 +114,6 @@ class Sylvie(discord.Client):
                     print(traceback.format_exc())
                 else:
                     print(traceback.format_exc())
-
 
     async def on_raw_reaction_add(self, payload: discord.RawReactionActionEvent):
         """
@@ -160,7 +160,7 @@ class Sylvie(discord.Client):
         scope = self.shell.create_scope(message.guild, [""])
         scope.channel = message.channel
         scope.user = member
-        scope.permission = utils.UserPermission.Script
+        scope.permission = utils.UserPermission.SCRIPT
         scope.message = message
 
         for plugin in self.shell.plugins:
@@ -170,7 +170,6 @@ class Sylvie(discord.Client):
                 self.logger.error(traceback.format_exc())
             else:
                 self.logger.error(traceback.format_exc())
-
 
     async def on_message(self, message: discord.Message):
         """
@@ -200,9 +199,9 @@ class Sylvie(discord.Client):
         scope.message = message
 
         if message.author == self.owner:
-            scope.permission = utils.UserPermission.BotOwner
+            scope.permission = utils.UserPermission.BOTOWNER
         elif message.author.guild_permissions.administrator:
-            scope.permission = utils.UserPermission.Admin
+            scope.permission = utils.UserPermission.ADMIN
 
         command_found = await self.shell.execute_command(scope, message.content)
 
@@ -217,7 +216,6 @@ class Sylvie(discord.Client):
             else:
                 print(traceback.format_exc())
 
-
     async def on_member_join(self, member):
         """Triggered when a member joins the guild.
 
@@ -228,7 +226,7 @@ class Sylvie(discord.Client):
             scope = self.shell.create_scope(member.guild, [''])
             scope.channel = self.shell.get_default_channel(member.guild)
             scope.user = member.guild.me
-            scope.permission = utils.UserPermission.Script
+            scope.permission = utils.UserPermission.SCRIPT
             scope.vars['target'] = member
 
             for plugin in self.shell.plugins:
@@ -261,7 +259,7 @@ class Sylvie(discord.Client):
             scope = self.shell.create_scope(guild, [''])
             scope.channel = self.shell.get_default_channel(guild)
             scope.user = member.guild.me
-            scope.permission = utils.UserPermission.Script
+            scope.permission = utils.UserPermission.SCRIPT
             scope.vars['target'] = member
             scope.vars['reason'] = reason
 
@@ -293,7 +291,7 @@ class Sylvie(discord.Client):
         ban_reason = ''
 
         try:
-            #We see if the bot is the author of the ban
+            # We see if the bot is the author of the ban
             async for ban in guild.audit_logs(action=discord.AuditLogAction.ban, limit=10):
                 if ban.target != member:
                     continue
@@ -311,16 +309,16 @@ class Sylvie(discord.Client):
                 ban_reason = reason
                 ban_target = ban.target
 
-            #We create the scope
+            # We create the scope
             scope = self.shell.create_scope(guild, [''])
             scope.channel = self.shell.get_default_channel(guild)
             scope.user = guild.me
-            scope.permission = utils.UserPermission.Script
+            scope.permission = utils.UserPermission.SCRIPT
             scope.vars['reason'] = ban_reason
             scope.vars['user'] = ban_author
             scope.vars['target'] = ban_target
 
-            #We send the event to all plugins
+            # We send the event to all plugins
             for plugin in self.shell.plugins:
                 await plugin.on_ban(scope)
 
@@ -341,7 +339,7 @@ class Sylvie(discord.Client):
             scope = self.shell.create_scope(guild, [''])
             scope.channel = self.shell.get_default_channel(guild)
             scope.user = guild.me
-            scope.permission = utils.UserPermission.Script
+            scope.permission = utils.UserPermission.SCRIPT
             scope.vars['target'] = user
 
             for plugin in self.shell.plugins:
@@ -408,7 +406,7 @@ def main():
         bot.loop.close()
         logger.info("Bot closed.")
         sys.exit(0)
-    except Exception as e:
+    except Exception:
         bot.loop.run_until_complete(bot.logout())
         bot.loop.close()
         logger.exception("Unhandled exception occured in main().")
