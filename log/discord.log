@@ -1,5 +1,0 @@
-[2024-02-17 23:13:58] [INFO    ] discord.client: logging in using static token
-[2024-02-17 23:13:59] [INFO    ] discord.gateway: Shard ID None has connected to Gateway (Session ID: 4668c1754a5a3d756f70f999333c20f3).
-[2024-02-17 23:14:01] [INFO    ] discord: Bot logged on as Sylvie2#6680
-[2024-02-17 23:14:01] [INFO    ] discord: Plugin Core loaded.
-[2024-02-17 23:14:01] [INFO    ] discord: Command say added to the tree.

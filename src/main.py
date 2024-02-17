@@ -128,9 +128,9 @@ class Sylvie(discord.Client):
             Discord payload of the event.
         """
         try:
-            channel = self.fetch_channel(payload.channel_id)
+            channel = await self.fetch_channel(payload.channel_id)
             message = await channel.fetch_message(payload.message_id)
-            member = self.fetch_user(payload.user_id)
+            member = await self.fetch_user(payload.user_id)
             emoji = payload.emoji
             if payload.event_type == 'REACTION_ADD':
                 added = True
