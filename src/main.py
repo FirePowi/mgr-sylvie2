@@ -35,18 +35,21 @@ import re
 import sys
 import traceback
 import logging
+import logging.handlers
+import asyncio
+import os
 
 # Third party imports
 import discord
-from discord import app_commands
+from discord.app_commands import CommandTree
 
 # Local application imports
 from database import Database
-import utils
+from utils import Shell, UserPermission
 from plugins.core import CorePlugin
 
 ###########
-##  Bot  ##
+#   Bot   #
 ###########
 # TODO: Create en table for each guild, and store the data in it:
 #       - On guild join, create the table
@@ -60,7 +63,7 @@ from plugins.core import CorePlugin
 class Sylvie(discord.Client):
     """
     Manager Sylvie 2.0's main class.
-    
+
     Inherits:
         discord.Client.
     """
@@ -70,12 +73,13 @@ class Sylvie(discord.Client):
         intents = discord.Intents.all()
         super().__init__(intents=intents)
 
-        self.tree = app_commands.CommandTree(self)
+        self.tree = CommandTree(self)
         self.mode = 'dev' if dev_mode else 'testing'
         self.database = Database(self.mode)
         self.owner = None
         self.banned_members = {}
-        self.shell = utils.Shell(self, self.database, self.tree)
+        self.shell = Shell(self, self.database, self.tree)
+        self.logger = None
 
     def setup_logger(self, logger):
         """Set up the logger."""
@@ -104,7 +108,7 @@ class Sylvie(discord.Client):
             scope = self.shell.create_scope(guild, [""])
             scope.channel = self.shell.get_default_channel(guild)
             scope.user = guild.me
-            scope.permission = utils.UserPermission.SCRIPT
+            scope.permission = UserPermission.SCRIPT
 
             for plugin in self.shell.plugins:
                 self.banned_members = {}
@@ -120,7 +124,7 @@ class Sylvie(discord.Client):
         Triggered on reaction added, trigger on_reaction_event with "added" set to true.
 
         Args:
-            payload (discord.RawReactionActionEvent): 
+            payload (discord.RawReactionActionEvent):
             Discord payload of the event.
         """
         try:
@@ -160,7 +164,7 @@ class Sylvie(discord.Client):
         scope = self.shell.create_scope(message.guild, [""])
         scope.channel = message.channel
         scope.user = member
-        scope.permission = utils.UserPermission.SCRIPT
+        scope.permission = UserPermission.SCRIPT
         scope.message = message
 
         for plugin in self.shell.plugins:
@@ -192,6 +196,7 @@ class Sylvie(discord.Client):
         prefix = {'testing': '%', 'dev': '!'}[self.mode]
         custom_prefix = self.shell.database.get_sql_data('guilds', ['command_prefix']), {
             'discord_gid': int(message.guild.id)}
+        print(f"Custom prefix: {custom_prefix}")
 
         scope = self.shell.create_scope(message.guild, custom_prefix or prefix)
         scope.channel = message.channel
@@ -199,9 +204,9 @@ class Sylvie(discord.Client):
         scope.message = message
 
         if message.author == self.owner:
-            scope.permission = utils.UserPermission.BOTOWNER
+            scope.permission = UserPermission.BOTOWNER
         elif message.author.guild_permissions.administrator:
-            scope.permission = utils.UserPermission.ADMIN
+            scope.permission = UserPermission.ADMIN
 
         command_found = await self.shell.execute_command(scope, message.content)
 
@@ -226,7 +231,7 @@ class Sylvie(discord.Client):
             scope = self.shell.create_scope(member.guild, [''])
             scope.channel = self.shell.get_default_channel(member.guild)
             scope.user = member.guild.me
-            scope.permission = utils.UserPermission.SCRIPT
+            scope.permission = UserPermission.SCRIPT
             scope.vars['target'] = member
 
             for plugin in self.shell.plugins:
@@ -239,9 +244,9 @@ class Sylvie(discord.Client):
 
     async def on_raw_member_remove(self, payload):
         """Triggered when a member leaves the guild.
-        
+
         Args:
-            payload (discord.RawReactionActionEvent): 
+            payload (discord.RawReactionActionEvent):
             Discord payload of the event triggered.
         """
         reason = "leave"
@@ -259,7 +264,7 @@ class Sylvie(discord.Client):
             scope = self.shell.create_scope(guild, [''])
             scope.channel = self.shell.get_default_channel(guild)
             scope.user = member.guild.me
-            scope.permission = utils.UserPermission.SCRIPT
+            scope.permission = UserPermission.SCRIPT
             scope.vars['target'] = member
             scope.vars['reason'] = reason
 
@@ -313,7 +318,7 @@ class Sylvie(discord.Client):
             scope = self.shell.create_scope(guild, [''])
             scope.channel = self.shell.get_default_channel(guild)
             scope.user = guild.me
-            scope.permission = utils.UserPermission.SCRIPT
+            scope.permission = UserPermission.SCRIPT
             scope.vars['reason'] = ban_reason
             scope.vars['user'] = ban_author
             scope.vars['target'] = ban_target
@@ -339,7 +344,7 @@ class Sylvie(discord.Client):
             scope = self.shell.create_scope(guild, [''])
             scope.channel = self.shell.get_default_channel(guild)
             scope.user = guild.me
-            scope.permission = utils.UserPermission.SCRIPT
+            scope.permission = UserPermission.SCRIPT
             scope.vars['target'] = user
 
             for plugin in self.shell.plugins:
@@ -350,67 +355,137 @@ class Sylvie(discord.Client):
         else:
             self.logger.error(traceback.format_exc())
 
+#############
+#  Logging  #
+#############
+
+
+def setup_logger(logfile, errfile):
+    """Set up the logger."""
+    logger = logging.getLogger('discord')
+
+    logger.setLevel(logging.DEBUG)
+    logging.getLogger('discord.http').setLevel(logging.INFO)
+    
+    # If directories do not exist, create them
+    if not os.path.exists(os.path.dirname(logfile)):
+        os.makedirs(os.path.dirname(logfile))
+    if not os.path.exists(os.path.dirname(errfile)):
+        os.makedirs(os.path.dirname(errfile))
+    
+    # Create the log and error files
+    log_handler = logging.handlers.RotatingFileHandler(
+        logfile,
+        'a',
+        1 * 1024 * 1024,
+        3,
+        'utf-8'
+    )
+    err_handler = logging.handlers.RotatingFileHandler(
+        errfile,
+        'a',
+        1 * 1024 * 1024,
+        3,
+        'utf-8'
+    )
+    dt_fmt = '%Y-%m-%d %H:%M:%S'  # Format for datetime: YYYY-MM-DD HH:MM:SS
+
+    # Format for logging: [datetime] [loglevel] loggername: message
+    # Style is set to '{' to avoid conflicts with f-strings
+    formatter = logging.Formatter(
+        '[{asctime}] [{levelname:<8}] {name}: {message}', dt_fmt, style='{'
+        )
+    log_handler.setFormatter(formatter)
+    err_handler.setFormatter(formatter)
+
+    err_handler.setLevel(logging.WARNING)
+    # Check if log file is not empty and doRollover if it is not
+    if os.path.exists(logfile) and os.path.getsize(logfile) > 0:
+        log_handler.doRollover()
+    if os.path.exists(errfile) and os.path.getsize(errfile) > 0:
+        err_handler.doRollover()
+
+    logger.addHandler(log_handler)
+    logger.addHandler(err_handler)
+    return logger
 
 #############
-##  Start  ##
+#   Start   #
 #############
+
 
 def main():
     """Start the bot."""
     try:
         with open('config.json', 'r', encoding="UTF-8") as f:
             config = json.load(f)
-    except FileNotFoundError:
+    except (FileNotFoundError, json.JSONDecodeError):
         with open('config.json', 'w', encoding="UTF-8") as f:
-            json.dump({"token": "", "dev_mode": False}, f)
+            json.dump({"token": "",
+                       "dev_mode": False,
+                       "log_file": "log/discord.log",
+                       "err_file": "log/discord_err.log"},
+                      f,
+                      indent=4)
         print("Please edit config.json to add a bot token.")
         sys.exit(0)
-    token = config['token']
-    dev_mode = config['dev_mode']
-    
-    # Set up logging
-    logger = logging.getLogger('discord')
-    logger.setLevel(logging.DEBUG)
-    logging.getLogger('discord.http').setLevel(logging.INFO)
+    for i in range(5):
+        try:
+            token = config['token']
+            dev_mode = config['dev_mode']
+            logfile = config['log_file']
+            errfile = config['err_file']
+        except KeyError as e:
+            if e.args[0] == 'token':
+                print("Please edit config.json to add a bot token.")
+                sys.exit(0)
+            elif e.args[0] == 'dev_mode':
+                # Set dev_mode to False if not set
+                dev_mode = False
+                # Modify the config file to add the dev_mode key
+                with open('config.json', 'w', encoding="UTF-8") as f:
+                    config['dev_mode'] = dev_mode
+                    json.dump(config, f, indent=4)
+            elif e.args[0] == 'log_file':
+                # Set log_file to "discord.log" if not set
+                logfile = "log/discord.log"
+                # Modify the config file to add the log_file key
+                with open('config.json', 'w', encoding="UTF-8") as f:
+                    config['log_file'] = logfile
+                    json.dump(config, f, indent=4)
+            elif e.args[0] == 'err_file':
+                # Set err_file to "discord_err.log" if not set
+                errfile = "log/discord_err.log"
+                # Modify the config file to add the err_file key
+                with open('config.json', 'w', encoding="UTF-8") as f:
+                    config['err_file'] = errfile
+                    json.dump(config, f, indent=4)
+            break
+    if not token:
+        print("Please edit config.json to add a bot token.")
+        sys.exit(0)
 
-    log_handler = logging.handlers.RotatingFileHandler(
-        filename='discord.log',
-        encoding='utf-8',
-        maxBytes=1 * 1024 * 1024,  # 1 MiB
-        backupCount=3,  # Rotate through 3 files
-    )
-    err_handler = logging.handlers.RotatingFileHandler(
-        filename='discord.err',
-        encoding='utf-8',
-        maxBytes=1 * 1024 * 1024,  # 1 MiB
-        backupCount=3,  # Rotate through 3 files
-    )
-    dt_fmt = '%Y-%m-%d %H:%M:%S' # Format for datetime: YYYY-MM-DD HH:MM:SS
-
-    # Format for logging: [datetime] [loglevel] loggername: message
-    # Style is set to '{' to avoid conflicts with f-strings
-    formatter = logging.Formatter('[{asctime}] [{levelname:<8}] {name}: {message}', dt_fmt, style='{')
-    log_handler.setFormatter(formatter)
-    err_handler.setFormatter(formatter)
-
-    err_handler.setLevel(logging.WARNING)
-
-    logger.addHandler(log_handler, err_handler)
-
+    logger = setup_logger(logfile, errfile)
+    bot = Sylvie(dev_mode)
     try:
-        bot = Sylvie(dev_mode)
+        # bot = Sylvie(dev_mode)
         bot.setup_logger(logger)
         bot.run(token)
     except KeyboardInterrupt:
-        bot.loop.run_until_complete(bot.logout())
-        bot.loop.close()
+        loop = asyncio.get_running_loop()
+        loop.run_until_complete(bot.close())
+        loop.close()
         logger.info("Bot closed.")
         sys.exit(0)
-    except Exception:
-        bot.loop.run_until_complete(bot.logout())
-        bot.loop.close()
-        logger.exception("Unhandled exception occured in main().")
-        sys.exit(1)
+    #except Exception as e:
+    #    try:
+    #        loop = asyncio.get_running_loop()
+    #        loop.run_until_complete(bot.close())
+    #        loop.close()
+    #    except RuntimeError:
+    #        pass
+    #    logger.exception(f"Bot closed with error: {e}")
+    #    sys.exit(1)
 
 
 if __name__ == '__main__':

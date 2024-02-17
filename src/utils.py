@@ -31,10 +31,9 @@ along with Manager Sylvie 2.0.  If not, see <http://www.gnu.org/licenses/>.
 # Standard library imports
 import random
 import re
-import shlex
 from enum import Enum, auto
 from functools import wraps
-from typing import Optional, Union
+from typing import Optional, Union, Callable
 import collections.abc
 import traceback
 import asyncio
@@ -71,17 +70,14 @@ class Verbose(Enum):
 
 class Error(Exception):
     """Generic Error."""
-    pass
 
 
 class ErrorInCode(Exception):
     """There is an error in the code."""
-    pass
 
 
 class TooLongScriptError(Error):
     """Script is too long for discord."""
-    pass
 
 
 class DiscordPermissionError(Error):
@@ -373,7 +369,7 @@ class ExecutionScope:
             return True
 
         # channel
-        if isinstance(what, discord.Channel):
+        if isinstance(what, discord.abc.GuildChannel):
             return what.permissions_for(member).view_channel
 
         # message
@@ -735,7 +731,8 @@ class Shell:
             locations = {
                 'guild': ['client', 'channels', 'members', 'emojis', 'stickers', 'me'],
                 'channel': ['guild', 'category_channel', 'text_channel', 'forum_channel', 'widget'],
-                'user': ['client', 'reaction', 'scheduled_event', 'guild', 'team', 'role', 'channel', 'widget'],
+                'user': ['client', 'reaction', 'scheduled_event',
+                         'guild', 'team', 'role', 'channel', 'widget'],
                 'emoji': ['client', 'guild'],
                 'sticker': ['guild'],
                 'sound': ['guild'],
@@ -799,13 +796,13 @@ class Shell:
         if self.is_plugin_loaded(plugin):
             self.logger.info(f"Plugin {plugin.name} is already loaded")
             return
-        try:
-            instance = plugin(self)
-            self.plugins.append(instance)
-            self.logger.info(f"Plugin {plugin.name} loaded.")
-        except BaseException:
-            self.logger.error(f"Plugin {plugin.name} can't be loaded. See Traceback:\n")
-            self.logger.error(traceback.format_exc())
+        #try:
+        instance = plugin(self)
+        self.plugins.append(instance)
+        self.logger.info(f"Plugin {plugin.name} loaded.")
+        #except BaseException:
+        #    self.logger.error(f"Plugin {plugin.name} can't be loaded. See Traceback:\n")
+        #    self.logger.error(traceback.format_exc())
 
     def find_command_and_option(self, command_line, prefixes):
         """Finds the command and options in a command line.
@@ -842,9 +839,9 @@ class Shell:
                          guild.public_updates_channel,
                          guild.text_channels[0],
                          guild.owner.dm_channel,
-                         guild.owner.create_dm(),
-                         guild.me.owner.dm_channel,
-                         guild.me.owner.create_dm()]
+                         guild.owner.create_dm,
+                         self.client.application.owner.dm_channel,
+                         self.client.application.owner.create_dm]
         missing_write_permissions = None
         for possibility in possibilities:
             # Check if possibility is an async function and await it if it is
@@ -862,7 +859,7 @@ class Shell:
             default_channel = possibility
             break
 
-        #Pick the first channel that is not None
+        # Pick the first channel that is not None
         if not default_channel:
             raise Error("No channel found (what?).")
         if missing_write_permissions is not None:
@@ -892,17 +889,30 @@ class Shell:
         #     'variable', ['name', 'value'],
         #     {'discord_gid': guild.id}, True)} or None
         scope.vars = {}
-        for row in self.database.get_sql_data('variable', ['name', 'value'], {'discord_gid': guild.id}, True):
+        for row in self.database.get_sql_data(
+                'variable',
+                ['name', 'value'],
+                {'discord_gid': guild.id},
+                True
+                ):
             scope.vars[row[0]] = row[1]
 
         # Get member variables from the database
         member_vars = {}
+
         def assignate_member_vars(member, key, value):
             if member not in member_vars.keys():
                 member_vars[member] = {}
             member_vars[member][key] = value
-        member_vars = {assignate_member_vars(row) for row in self.database.get_sql_data(
-            'member_variables', ['discord_mid', 'name', 'value'], None, True)} or None
+
+        datas = self.database.get_sql_data(
+            'member_variables',
+            ['discord_mid', 'name', 'value'],
+            {'discord_gid': guild.id},
+            True
+            )
+        for row in datas:
+            assignate_member_vars(row[0], row[1], row[2])
 
         return scope
 
@@ -944,7 +954,12 @@ class Shell:
             return False
 
         for plugin in self.plugins:
-            if await plugin.execute_command(scope, parsedCommand[0], parsedCommand[1], parsedCommand[2]):
+            if await plugin.execute_command(
+                    scope,
+                    parsedCommand[0],
+                    parsedCommand[1],
+                    parsedCommand[2]
+                    ):
                 scope.iter += 1
                 return True
         raise CommandNotFoundError(parsedCommand[0])
@@ -979,25 +994,55 @@ class Shell:
                 await self.print(scope, f"Command `{command}` not found.", 'error')
                 break
             except DiscordPermissionError as error:
-                await self.print(scope, f"This command is restricted to {error.required_permission} you must have this role or higher, you don't.", 'permission')
+                perm = error.required_permission
+                await self.print(
+                    scope,
+                    f"This command is restricted to {perm} you must have this role or higher, you don't.",
+                    'permission'
+                    )
                 break
             except ParameterPermissionError as error:
-                await self.print(scope, f"You are not allowed to use the parameter `{error.parameter}`.")
+                await self.print(
+                    scope,
+                    f"You are not allowed to use the parameter `{error.parameter}`.",
+                    'permission'
+                    )
                 break
             except ObjectNameError as error:
-                await self.print(scope, f"{error.parameter} must be a letter followed by alphanumeric characters.", 'error')
+                await self.print(
+                    scope,
+                    f"{error.parameter} must be a letter followed by alphanumeric characters.",
+                    'error'
+                    )
                 break
             except IntegerError as error:
-                await self.print(scope, f"{error.parameter} must be a number.", 'error')
+                await self.print(
+                    scope,
+                    f"{error.parameter} must be a number.",
+                    'error'
+                    )
                 break
             except RegexError as error:
-                await self.print(scope, f"`{error.regex}` is not a valid regex", 'error')
+                await self.print(
+                    scope,
+                    f"`{error.regex}` is not a valid regex",
+                    'error'
+                    )
                 break
             except Exception as error:
-                await self.print(scope, f"**Manager Sylvie Unexpected Error**\n\n```traceback\n{traceback.format_exc()}```", 'fatal')
+                tback = f"traceback\n```{traceback.format_exc()}```"
+                await self.print(
+                    scope,
+                    f"**Manager Sylvie Unexpected Error**\n{error}\n\n{tback}",
+                    'fatal'
+                    )
                 break
         else:
-            await self.print(scope, "Script executed successfully.", 'success')
+            await self.print(
+                scope,
+                "Script executed successfully.",
+                'success'
+                )
 
     async def send(self, recipient, content, embed=None):
         return await recipient.send(content, embed=embed)
@@ -1013,8 +1058,9 @@ class Shell:
         except discord.Forbidden as error:
             self.print(
                 scope,
-                f"{scope.guild.me.mention} does **not** have permission to send add role, discord API replied:\n{error.response}\n{error.message}",
-                'fatal')
+                f"{scope.guild.me.mention} does **not** have permission to send add role, discord error:\n{error}",
+                'fatal'
+                )
 
         return (added, removed)
 
@@ -1022,11 +1068,11 @@ class Shell:
 #  Plugin  #
 ############
 
-
 class Plugin:
     """
     Parent class of all Plugins – Is an Abstract
     """
+    name = "Plugin"
 
     def __init__(self, shell):
         self.shell = shell
@@ -1037,6 +1083,42 @@ class Plugin:
 
     async def list_commands(self):
         return list(self.cmds.keys())
+
+    async def add_slash_command(self, *, name, description, callback, nsfw=False, parent=None, guild_ids=None):
+        """
+        Create a slash command.
+
+        Args:
+            name (str): The name of the command.
+            description (str): The description of the command.
+            callback (function): The function to execute.
+            nsfw (bool): Whether the command is NSFW.
+            parent (str): The parent of the command.
+            guild_ids (list): The guilds where the command is available.
+        """
+        test_server = await self.shell.client.fetch_guild(1051692008307183656)
+
+        guilds = guild_ids or (self.shell.client.mode == 'dev' and [test_server.id]) or None
+        command = discord.app_commands.Command(
+            name=name,
+            description=description,
+            callback=callback,
+            nsfw=nsfw,
+            parent=None,
+            guild_ids=guilds
+        )
+        self.shell.client.tree.add_command(command)
+        self.shell.logger.info(f"Command {name} added to the tree.")
+
+        await self.shell.client.tree.sync(guild=test_server)
+        self.shell.logger.info(f"Command {name} synced.")
+
+        if self.shell.client.mode == 'dev':
+            self.shell.logger.debug(f"Command {name} added to the test server. Testing...")
+            test = self.shell.client.tree.get_command(name, guild=test_server)
+            if not test:
+                self.shell.logger.error(f"Command {name} not found in test server.")
+            
 
     async def execute_command(self, scope, command, options, lines):
         """
@@ -1060,23 +1142,33 @@ class Plugin:
     async def on_member_join(self, scope):
         """A member joins the guild."""
         return False
+
     async def on_ban(self, scope):
         """A member is banned from the guild."""
         return False
+
     async def on_kick(self, scope):
         """A member is kicked from the guild."""
         return False
+
     async def on_leave(self, scope):
         """A member leaves the guild."""
         return False
+
     async def on_unban(self, scope):
         """A member is unbanned from the guild."""
         return False
+
     async def on_message(self, scope, message, command_found):
         """A message is sent in the guild."""
         return False
+
     async def on_reaction(self, scope, message, emoji, member, added):
         """A reaction is added or removed from a message in the guild."""
+        return False
+
+    async def on_ready(self, scope):
+        """The bot is ready."""
         return False
 
     def add_command(self, name, cmd, register=None):
@@ -1090,36 +1182,10 @@ class Plugin:
             ErrorInCode: The command already exists.
         """
         if name in self.cmds:
-            #This should NEVER happen, error in the code! Check the name of the command for dups.
+            # This should NEVER happen, error in the code! Check the name of the command for dups.
             raise ErrorInCode(f'Command {name} already exists')
         self.cmds[name] = cmd
         # TODO: Move this to the shell
-
-    async def parse_options(self, scope, parser, options):
-        """Parse the options of a prefixed command.
-
-        Args:
-            scope (ExecutionScope): The scope in which the command is executed.
-            parser (ArgumentParser): The parser to use.
-            options (str): The options to parse.
-
-        Returns:
-            Namespace: The parsed options.
-        """
-        try:
-            args = parser.parse_args(shlex.split(options)) if options else None
-            return args
-        except UsageError as error:
-            message = getattr(error, 'text', str(error))
-            await self.shell.print(scope, message, 'usage')
-        except ParserExit as error:
-            message = getattr(error, 'text', str(error))
-            if message.find(f"{parser.prog}: error: ") >= 0:
-                parts = message.split(f"{parser.prog}: error: ")
-                await self.shell.print(scope, f"{parts[1]}\n{parts[0]}", 'error')
-            else:
-                await self.shell.print(scope, "ParserError, please contact Pixels", 'error')
-        return None
 
     def ensure_object_name(self, parameter, name):
         """Check if the object name is valid.

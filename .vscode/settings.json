@@ -3,4 +3,19 @@
         "*/*tmp*": true
     },
     "python.languageServer": "Pylance",
+    "python.analysis.diagnosticMode": "workspace",
+    "python.analysis.extraPaths": [
+        "{workspaceFolder}/src",
+        "{workspaceFolder}"
+    ],
+    "python.defaultInterpreterPath": ".venv/bin/python",
+
+    "pylint.importStrategy": "fromEnvironment",
+    "flake8.importStrategy": "fromEnvironment",
+    "mypy-type-checker.importStrategy": "fromEnvironment",
+    "flake8.cwd": "${workspaceFolder}",
+    "pylint.args": [
+        "--disable=W0613",
+    ],
+    
 }

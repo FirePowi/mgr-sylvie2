@@ -21,23 +21,16 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with Manager Sylvie 2.0.  If not, see <http://www.gnu.org/licenses/>.
 """
-# Ignore Flake8 F401
-# flake8: noqa
-# Ignore Mypy error
-# mypy: ignore-errors
-
-# standard library
-from typing import Optional, Union
+from typing import Optional
 
 # Thrid party modules
 import discord
-import discord.app_commands as app_commands
 from dateutil.relativedelta import relativedelta
 from pytz import timezone
-from typing import List
 
 # Local modules
-from utils import *
+from utils import Plugin
+
 
 class CorePlugin(Plugin):
     """
@@ -54,26 +47,31 @@ class CorePlugin(Plugin):
 
     def __init__(self, shell):
         super().__init__(shell)
-        self.add_command("say", self.execute_say)
+        # self.add_command("say", self.execute_say)
 
-    @app_commands.command(
-        name="say",
-        description="A command allowing you to send a message")
-    async def slash_say(self,
-                        interaction: discord.Interaction,
-                        message: str,
-                        channel: Optional[discord.abc.GuildChannel],
-                        user: Optional[discord.User],
-                        reactions: Optional[List[Union[discord.Emoji, str]]],
-                        title: Optional[str],
-                        description: Optional[str],
-                        footer: Optional[str],
-                        footerimager: Optional[str],
-                        thumbnail: Optional[str],
-                        author: Optional[str],
-                        authorimage: Optional[str],
-                        authorurl: Optional[str],
-                        fields: Optional[List[str]]):
+    async def on_ready(self, scope):
+        """
+        When the bot is ready, add the slash commands.
+        """
+        await self.add_slash_command(name="say", callback=self.say, description="Send a message.")
+
+    async def say(
+            self,
+            interaction: discord.Interaction,
+            message: str,
+            channel: Optional[discord.abc.GuildChannel],
+            user: Optional[discord.User],
+            reactions: Optional[str],
+            title: Optional[str],
+            description: Optional[str],
+            footer: Optional[str],
+            footerimager: Optional[str],
+            thumbnail: Optional[str],
+            author: Optional[str],
+            authorimage: Optional[str],
+            authorurl: Optional[str],
+            fields: Optional[str]
+            ):
         """
         A command allowing you to send a message.
 
@@ -110,13 +108,25 @@ class CorePlugin(Plugin):
             return
 
         # Check permissions
-        if not isinstance(recipient, discord.User):
-            if not can_they_see:
+        # Case 0: User is the bot owner, no permissions required
+        # Case 1: Recipient is a channel, user must have permission to send messages in the channel
+        # Case 2: Recipient is a user, user must have admin permissions
+        if interaction.user == self.shell.client.owner:
+            pass
+        elif isinstance(recipient, discord.abc.GuildChannel):
+            if not recipient.permissions_for(interaction.user).send_messages:
                 await interaction.response.send_message(
-                    "You do not have permission to send messages in this channel",
+                    "You do not have permission to send messages in that channel",
                     ephemeral=True)
                 return
-        
+        elif isinstance(recipient, discord.Member):
+            if not interaction.user.guild_permissions.administrator:
+                await interaction.response.send_message(
+                    "You do not have permission to send messages to that user",
+                    ephemeral=True)
+                return
+
+        embed = None
         # Create the embed if applicable: Check if any of the embed arguments are set
         if any([title,
                 description,
@@ -155,9 +165,14 @@ class CorePlugin(Plugin):
                     name=field_key,
                     value=field_value
                     )
-        
+
         # Send the message
-        message = await recipient.send(message, embed=embed if embed else None)
+        message = await recipient.send(message, embed=embed)
         if reactions:
             for reaction in reactions:
                 await message.add_reaction(reaction)
+
+        await interaction.response.send_message(
+            "Message sent",
+            ephemeral=True
+            )

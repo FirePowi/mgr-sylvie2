@@ -1,0 +1,21 @@
+[2024-02-17 23:02:45] [ERROR   ] discord.app_commands.tree: Ignoring exception in command 'say'
+Traceback (most recent call last):
+  File "d:\Dev\Manager Sylvie 2.0\.venv\Lib\site-packages\discord\app_commands\commands.py", line 827, in _do_call
+    return await self._callback(self.binding, interaction, **params)  # type: ignore
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Dev\Manager Sylvie 2.0/src\plugins\core.py", line 169, in say
+    message = await recipient.send(message, embed=embed if embed else None)
+                                                           ^^^^^
+UnboundLocalError: cannot access local variable 'embed' where it is not associated with a value
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "d:\Dev\Manager Sylvie 2.0\.venv\Lib\site-packages\discord\app_commands\tree.py", line 1248, in _call
+    await command._invoke_with_namespace(interaction, namespace)
+  File "d:\Dev\Manager Sylvie 2.0\.venv\Lib\site-packages\discord\app_commands\commands.py", line 853, in _invoke_with_namespace
+    return await self._do_call(interaction, transformed_values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "d:\Dev\Manager Sylvie 2.0\.venv\Lib\site-packages\discord\app_commands\commands.py", line 846, in _do_call
+    raise CommandInvokeError(self, e) from e
+discord.app_commands.errors.CommandInvokeError: Command 'say' raised an exception: UnboundLocalError: cannot access local variable 'embed' where it is not associated with a value
