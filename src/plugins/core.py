@@ -63,7 +63,7 @@ class CorePlugin(Plugin):
                         message: str,
                         channel: Optional[discord.abc.GuildChannel],
                         user: Optional[discord.User],
-                        reactions: Optional[list[discord.Emoji]],
+                        reactions: Optional[List[Union[discord.Emoji, str]]],
                         title: Optional[str],
                         description: Optional[str],
                         footer: Optional[str],
@@ -72,7 +72,7 @@ class CorePlugin(Plugin):
                         author: Optional[str],
                         authorimage: Optional[str],
                         authorurl: Optional[str],
-                        fields: Optional[list[str]]):
+                        fields: Optional[List[str]]):
         """
         A command allowing you to send a message.
 
