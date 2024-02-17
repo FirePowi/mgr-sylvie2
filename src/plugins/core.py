@@ -34,6 +34,7 @@ import discord
 import discord.app_commands as app_commands
 from dateutil.relativedelta import relativedelta
 from pytz import timezone
+from typing import List
 
 # Local modules
 from utils import *
