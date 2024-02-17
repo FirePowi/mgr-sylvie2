@@ -43,15 +43,9 @@ import asyncio
 import discord
 import discord.interactions
 
-# Local imports
-#import discord_parse as dparse
-
-#UsageError = dparse.UsageError
-#ArgumentError = dparse.ArgumentError
-
-###########
-# Enums   #
-###########
+############
+#  Enums   #
+############
 
 
 class UserPermission(Enum):
@@ -733,7 +727,7 @@ class Shell:
                 else 'sticker' if isinstance(host, discord.GuildSticker) \
                 else 'role' if isinstance(host, discord.Role) \
                 else 'client' if isinstance(host, discord.Client) \
-                else None
+                else 'none'
             if not host_type:
                 raise TypeError(f"Type {type(host)} not recognized")
 
@@ -746,7 +740,8 @@ class Shell:
                 'sticker': ['guild'],
                 'sound': ['guild'],
                 'role': ['audit_log_diff', 'guild', 'member', 'emoji'],
-                'client': ['users', 'user', 'guilds', 'emojis', 'stickers', 'application']
+                'client': ['users', 'user', 'guilds', 'emojis', 'stickers', 'application'],
+                'none': []
             }
             # Get the list of possible search_items for the host_type
             host_resources = locations.get(host_type)

@@ -21,6 +21,11 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with Manager Sylvie 2.0.  If not, see <http://www.gnu.org/licenses/>.
 """
+# Ignore Flake8 F401
+# flake8: noqa
+# Ignore Mypy error
+# mypy: ignore-errors
+
 # standard library
 from typing import Optional, Union
 
@@ -31,10 +36,7 @@ from dateutil.relativedelta import relativedelta
 from pytz import timezone
 
 # Local modules
-#import utils
 from utils import *
-#import src.utils as utils
-
 
 class CorePlugin(Plugin):
     """
@@ -59,8 +61,8 @@ class CorePlugin(Plugin):
     async def slash_say(self,
                         interaction: discord.Interaction,
                         message: str,
-                        recipient: Optional[Union[discord.abc.GuildChannel,
-                                                  discord.User]],
+                        channel: Optional[discord.abc.GuildChannel],
+                        user: Optional[discord.User],
                         reactions: Optional[list[Union[discord.Emoji,
                                                        discord.PartialEmoji]]],
                         title: Optional[str],
@@ -78,7 +80,8 @@ class CorePlugin(Plugin):
         Args:
             interaction: The interaction.
             message: The message to send.
-            recipient: The recipient of the message.
+            channel: The channel to send the message in.
+            user: The user to send the message to.
             reactions: The reactions to add to the message.
             title: The title of the embed.
             description: The description of the embed.
@@ -93,14 +96,13 @@ class CorePlugin(Plugin):
             return
 
         # Where to send the message
+        recipient = channel or user or None
         if not recipient:
             recipient = interaction.channel or interaction.user
-        if isinstance(recipient, discord.User):
+        if user and not channel:
             if recipient.dm_channel is None:
                 await recipient.create_dm()
             recipient = recipient.dm_channel
-        if not isinstance(recipient, discord.abc.Messageable):
-            recipient = interaction.channel or interaction.user.dm_channel
         if not recipient:
             await interaction.response.send_message(
                 "Could not find a channel to send the message to",

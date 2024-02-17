@@ -2,3 +2,4 @@ database/*
 src/tmp.py
 MSv2.code-workspace
 config.json
+.vscode/*
