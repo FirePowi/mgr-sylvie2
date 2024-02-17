@@ -44,10 +44,10 @@ import discord
 import discord.interactions
 
 # Local imports
-import discord_parse as dparse
+#import discord_parse as dparse
 
-UsageError = dparse.UsageError
-ArgumentError = dparse.ArgumentError
+#UsageError = dparse.UsageError
+#ArgumentError = dparse.ArgumentError
 
 ###########
 # Enums   #

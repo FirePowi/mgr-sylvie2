@@ -32,8 +32,8 @@ along with Manager Sylvie 2.0.  If not, see <http://www.gnu.org/licenses/>.
 import os
 
 # third-party library
-import mysql.connector as sql
-from mysql.connector import errorcode
+import pymysql as sql
+#from pymysql.connector import errorcode
 import sqlite3
 
 MYSQL = 0
@@ -80,7 +80,8 @@ class Database():
             database_passwd = os.environ.get('SQL_PASSWD')
             database_database = os.environ.get('SQL_DATABASE')
 
-            self.databasecon = sql.connect()
+            #self.databasecon = sql.connect()
+            self.databasecon = sql.connections.Connection(user=database_user, passworld=database_passwd, database=database_database)
             self.databasetype = MYSQL
 
         else:

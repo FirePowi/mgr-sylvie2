@@ -31,7 +31,9 @@ from dateutil.relativedelta import relativedelta
 from pytz import timezone
 
 # Local modules
-import src.utils as utils
+#import utils
+from utils import *
+#import src.utils as utils
 
 
 class CorePlugin(Plugin):
