@@ -63,7 +63,7 @@ class CorePlugin(Plugin):
                         message: str,
                         channel: Optional[discord.abc.GuildChannel],
                         user: Optional[discord.User],
-                        reactions: Optional[list[Union[discord.Emoji, str]]],
+                        reactions: Optional[list[discord.Emoji]],
                         title: Optional[str],
                         description: Optional[str],
                         footer: Optional[str],
